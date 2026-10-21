@@ -1,0 +1,12 @@
+
+services:
+  opencode:
+    build: .
+    ports:
+      - "127.0.0.1:4096:4096"
+    environment:
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD}
+    volumes:
+      - ./opencode-config:/root/.config/opencode
+      - ./opencode-data:/root/.local/share/opencode
+    restart: unless-stopped
