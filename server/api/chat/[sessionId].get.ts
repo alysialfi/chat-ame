@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
 	const oldest = actualRows.at(-1)
 
 	return {
-		data: actualRows.reverse().map(({role, content}) => ({role, content})),
+		data: actualRows.reverse().map(({id, role, content}) => ({id, role, content})),
 		hasMore,
 		sessionAlive,
 		nextCursor: oldest ? Number(oldest.id) : null
