@@ -6,5 +6,11 @@ export default function() {
 		return res.sessionId
 	}
 
-	return { createSession }
+	const deleteSession = async (id: string): Promise<void> => {
+		await $fetch(`/api/session/${id}`, {
+			method: 'DELETE'
+		})
+	}
+
+	return { createSession, deleteSession }
 }
