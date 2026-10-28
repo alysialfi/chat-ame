@@ -1,14 +1,12 @@
 export const MODELS = [
-	'longcat-2.5-preview-free',
-	'space-bunny-free',
-	'mimo-v2.6-flash-free',
-	'nemotron-3-ultra-free',
-	'glm-5.3-flash-free',
-	'nemotron-3.5-lightning-free',
-	'nemotron-3.5-super-vl-free',
 	'deepseek-v4.1-flash-free',
+	'flint-40b-free',
+	'mimo-v2.6-flash-free',
 	'beam-free',
+	'nemotron-3.5-lightning-free',
 	'big-pickle',
+	'glm-5.3-flash-free',
+	'nemotron-3.5-super-vl-free',
 ]
 
 const PROVIDER_ID = 'opencode'
