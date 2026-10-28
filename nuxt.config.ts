@@ -15,5 +15,8 @@ export default defineNuxtConfig({
     public: {
       // later
     }
+  },
+	devServer: {
+    port: 3030
   }
 })
