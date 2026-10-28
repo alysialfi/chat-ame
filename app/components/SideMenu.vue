@@ -7,7 +7,7 @@
 			New chat
 		</NuxtLink>
 		<ul class="flex-grow-1 overflow-y-auto">
-			<li v-for="title in sessionTitles" :class="$route.params.id === title.id ? 'bg-gray-200 rounded-md' : 'bg-neutral-50'">
+			<li v-for="title in sessionData" :class="$route.params.id === title.id ? 'bg-gray-200 rounded-md' : 'bg-neutral-50'">
 				<NuxtLink :to="`/chat/${title.id}`" class="block p-4 text-gray-600">{{ title.title }}</NuxtLink>
 			</li>
 		</ul>
@@ -15,5 +15,28 @@
 </template>
 
 <script lang="ts" setup>
-	const { data: sessionTitles, pending, error, refresh } = await useFetch('/api/session')
+	type SessionData = {
+		id: string
+		title: string
+	}
+	const route = useRoute()
+	const {getSessionState} = useAiChat()
+	const { data, pending, error, refresh } = await useFetch<SessionData[]>('/api/session')
+
+	const sessionData = ref<SessionData[]>(data.value ?? [])
+	const pendingSidebarEntry = useState<SessionData | null>('pending-sidebar', () => null)
+
+	watch(() => pendingSidebarEntry.value, (newValue, oldValue) => {
+		if (newValue) {
+			sessionData.value = [newValue, ...sessionData.value]
+			pendingSidebarEntry.value = null
+		}
+	})
+
+	watch(() => route.params.id && getSessionState(route.params.id as string).isLoading, async (isLoading, wasLoading) => {
+		if (wasLoading && !isLoading) {
+			await refresh()
+			sessionData.value = data.value ?? []
+		}
+	})
 </script>
