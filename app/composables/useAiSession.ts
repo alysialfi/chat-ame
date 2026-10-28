@@ -1,12 +1,10 @@
 export default function() {
-	const sessionId = ref<string | null>(null)
-
-	const getSession = async () => {
-		const res = await $fetch('/api/session', {
+	const createSession = async (): Promise<string> => {
+		const res = await $fetch<{sessionId: string}>('/api/session', {
 			method: 'POST'
 		})
-		sessionId.value = res.sessionId
+		return res.sessionId
 	}
 
-	return { getSession, sessionId }
+	return { createSession }
 }
