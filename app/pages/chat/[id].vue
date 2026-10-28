@@ -8,7 +8,14 @@
 	const init = async (sessionId: string) => {
 		if (!sessionId) return
 		if (!startMessage(sessionId)) {
-			await restoreChat(sessionId)
+			try {
+				await restoreChat(sessionId)
+			} catch (error) {
+				if (error.statusCode !== 404) {
+					throw error
+				}
+				showError(createError({statusCode: 404, statusMessage: 'Session not found'}))
+			}
 		}
 	}
 
