@@ -1,13 +1,32 @@
 export interface ChatMessage {
 	role: 'user' | 'assistant'
 	content: string
+	id?: number
 }
-
 interface StreamPayload {
 	sessionId?: string
 	delta?: string
 	error?: { message?: string }
+	done?: boolean
 }
+export interface SessionChatState {
+	messages: ChatMessage[]
+	isLoading: boolean
+	cursor: number | null
+	allChatLoaded: boolean
+	isLoadingMore: boolean
+	readOnly: boolean
+	loaded: boolean
+	pendingPrompt: string | null
+}
+
+export interface SessionData {
+	id: string
+	title: string
+}
+
+const chatControllers = new Map<string, AbortController>()
+const restorePromises = new Map<string, Promise<void>>()
 
 /**
  * Parses a single SSE line ("data: {...}") and yields the payload object.
@@ -61,139 +80,193 @@ async function readSseStream(
 	}
 }
 
+function createState(): SessionChatState {
+	return {
+		messages: [],
+		isLoading: false,
+		cursor: null,
+		allChatLoaded: false,
+		isLoadingMore: false,
+		readOnly: false,
+		loaded: false,
+		pendingPrompt: null
+	}
+}
+
 export function useAiChat() {
-	const { getSession, sessionId } = useAiSession()
-	const messages = ref<ChatMessage[]>([])
-	const isLoading = ref(false)
-	// const sessionId = ref<string | null>(null)
-	const initialPrompt = useState<string>('initial-prompt', () => '')
+	const { createSession } = useAiSession()
+	const sessions = useState<Record<string, SessionChatState>>('ai-chat-sessions', () => ({}))
+	const pendingSidebarEntry = useState<SessionData | null>('pending-sidebar', () => null)
 
-	// pagination
-	const cursor = ref<number | null>(null)
-	const allChatLoaded = ref<boolean>(false)
-	const isLoadingMore = ref<boolean>(false)
-	// true when the OpenCode session no longer exists (history viewable, no new prompts)
-	const readOnly = ref<boolean>(false)
-
-	let abortController: AbortController | null = null
-
-	const stop = () => {
-		if (abortController) {
-			abortController.abort()
-			abortController = null
+	const stop = (id: string) => {
+		const ac = chatControllers.get(id)
+		if (ac) {
+			ac.abort()
+			chatControllers.delete(id)
 		}
-		isLoading.value = false
+		getSessionState(id).isLoading = false
 	}
 
-	const reset = () => {
-		stop()
-		messages.value = []
-		sessionId.value = null
-		cursor.value = null
-		allChatLoaded.value = false
-		readOnly.value = false
+	const reset = (id: string) => {
+		stop(id)
+		sessions.value[id] = createState()
+	}
+
+	const getSessionState = (id: string): SessionChatState => {
+		if (!sessions.value[id]) {
+			sessions.value[id] = createState()
+		}
+		return sessions.value[id]!
+	}
+
+	const takePendingPrompt = (id: string): string | null => {
+		const state = getSessionState(id)
+		const prompt = state.pendingPrompt
+		state.pendingPrompt = null
+		return prompt
 	}
 
 	const createChat = async (prompt: string) => {
-		await getSession()
-		initialPrompt.value = prompt
-		navigateTo(`/chat/${sessionId.value}`)
+		const text = prompt.trim()
+		if (!text) {
+			return
+		}
+
+		const id = await createSession()
+		pendingSidebarEntry.value = {id, title: text.slice(0, 60)}
+		getSessionState(id).pendingPrompt = text
+		navigateTo(`/chat/${id}`)
 	}
 
-	const startMessage = async (id: string) => {
-		sessionId.value = id
-		sendMessage(initialPrompt.value)
-		// initialPrompt.value = ''
-	}
-
-	const sendMessage = async (userMessage: string) => {
+	const sendMessage = async (id: string, userMessage: string) => {
+		const state = getSessionState(id)
 		const text = userMessage.trim()
-		if (!text || isLoading.value || readOnly.value) return
+		if (!text || state.isLoading || state.readOnly) return
 
-		messages.value.push({ role: 'user', content: text })
-		messages.value.push({ role: 'assistant', content: '' })
+		state.loaded = true
+		state.messages.push({ role: 'user', content: text })
+		state.messages.push({ role: 'assistant', content: '' })
 
-		const assistantMsg = messages.value[messages.value.length - 1]!
-		isLoading.value = true
-		abortController = new AbortController()
+		const assistantMsg = state.messages[state.messages.length - 1]!
+		state.isLoading = true
+
+		const ac = new AbortController()
+		chatControllers.set(id, ac)
 
 		try {
 			const response = await $fetch('/api/chat', {
 				method: 'POST',
-				body: { sessionId: sessionId.value, message: text },
+				body: { sessionId: id, message: text },
 				responseType: 'stream',
-				signal: abortController.signal
+				signal: ac.signal
 			})
 
 			await readSseStream(response as ReadableStream<Uint8Array>, (payload) => {
 				if (payload.error) {
 					throw new Error(payload.error.message ?? 'Upstream error')
 				}
-				if (payload.sessionId) {
-					sessionId.value = payload.sessionId
-				}
 				if (payload.delta) {
 					assistantMsg.content += payload.delta
 				}
 			})
 		} catch (err: any) {
-			if (err?.name === 'AbortError' || abortController?.signal.aborted) return
+			if (err?.name === 'AbortError' || ac.signal.aborted) return
 
 			const message = err?.data?.message || err?.data?.statusMessage || err?.message || 'Request failed'
 			assistantMsg.content = assistantMsg.content ? `${assistantMsg.content}\n\n[Error: ${message}]` : `Error: ${message}`
 		} finally {
-			abortController = null
-			isLoading.value = false
+			if (chatControllers.get(id) === ac) {
+				chatControllers.delete(id)
+				state.isLoading = false
+			}
 		}
+	}
+
+	const startMessage = (id: string): boolean => {
+		const prompt = takePendingPrompt(id)
+		if (!prompt) {
+			return false
+		}
+
+		void sendMessage(id, prompt)
+		return true
 	}
 
 	const restoreChat = async (id: string) => {
-		sessionId.value = id
-		cursor.value = null
-		allChatLoaded.value = false
+		const state = getSessionState(id)
+		if (state.isLoading || state.loaded) {
+			return
+		}
+		if (restorePromises.has(id)) {
+			return restorePromises.get(id)
+		}
 
-		const res = await $fetch(`/api/chat/${sessionId.value}`)
+		const promise = (async () => {
+			try {
+				state.cursor = null
+				state.allChatLoaded = false
 
-		messages.value = res.data as ChatMessage[]
-		cursor.value = res.nextCursor
-		allChatLoaded.value = !res.hasMore
-		readOnly.value = !res.sessionAlive
+				const res = await $fetch<{
+					data: ChatMessage[]
+					nextCursor: number | null
+					hasMore: boolean
+					sessionAlive: boolean
+				}>(`/api/chat/${id}`)
+
+				if (state.isLoading) {
+					return
+				}
+
+				state.messages = res.data as ChatMessage[]
+				state.cursor = res.nextCursor
+				state.allChatLoaded = !res.hasMore
+				state.readOnly = !res.sessionAlive
+				state.loaded = true
+			} finally {
+				restorePromises.delete(id)
+			}
+		})()
+
+		restorePromises.set(id, promise)
+		return promise
 	}
 
-	const canLoadMore = computed(() => {
-		return !allChatLoaded.value && !isLoadingMore.value && !!sessionId.value
-	})
+	const canLoadMore = (id: string) => {
+		const state = getSessionState(id)
+		return !state.allChatLoaded && !state.isLoadingMore && state.cursor !== null
+	}
 
-	const loadMoreChats = async () => {
-		if (!canLoadMore.value) {
+	const loadMoreChats = async (id: string) => {
+		const state = getSessionState(id)
+		if (!canLoadMore(id)) {
 			return
 		}
 
-		isLoadingMore.value = true
+		state.isLoadingMore = true
 		try {
-			const res = await $fetch(`/api/chat/${sessionId.value}`, {
-				query: { cursor: cursor.value }
+			const res = await $fetch<{
+				data: ChatMessage[]
+				nextCursor: number | null
+				hasMore: boolean
+			}>(`/api/chat/${id}`, {
+				query: { cursor: state.cursor }
 			})
-			messages.value = [...res.data as ChatMessage[], ...messages.value]
-			cursor.value = res.nextCursor
-			allChatLoaded.value = !res.hasMore
+			state.messages = [...res.data, ...state.messages]
+			state.cursor = res.nextCursor
+			state.allChatLoaded = !res.hasMore
 		} finally {
-			isLoadingMore.value	= false
+			state.isLoadingMore	= false
 		}
 	}
 
 	return {
-		messages,
-		isLoading,
-		sessionId,
+		getSessionState,
 		createChat,
 		startMessage,
 		sendMessage,
 		canLoadMore,
 		restoreChat,
 		loadMoreChats,
-		allChatLoaded,
-		readOnly,
 		stop,
 		reset
 	}
