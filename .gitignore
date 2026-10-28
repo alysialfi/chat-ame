@@ -25,3 +25,7 @@ logs
 
 # Local OpenCode runtime data
 opencode-data/
+
+# Local editor/agent config
+settings.json
+AGENTS.md
