@@ -1,4 +1,5 @@
 import { storeToChatsTable } from '../utils/chats'
+import { assertSessionNotDeleted } from '../utils/sessions'
 
 export default defineEventHandler(async (event) => {
 	const ocFetch = useOpenCode()
@@ -9,6 +10,10 @@ export default defineEventHandler(async (event) => {
 	}
 	if (sessionId !== undefined && sessionId !== null && typeof sessionId !== 'string') {
 		throw createError({ statusCode: 400, statusMessage: 'sessionId must be a string' })
+	}
+
+	if (sessionId) {
+		await assertSessionNotDeleted(event, sessionId)
 	}
 
 	const upstreamError = async (res: Response) => {
