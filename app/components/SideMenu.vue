@@ -25,7 +25,7 @@
 		title: string
 	}
 	const route = useRoute()
-	const { getSessionState, reset } = useAiChat()
+	const { reset } = useAiChat()
 	const { deleteSession } = useAiSession()
 	const { data, pending, error, refresh } = await useFetch<SessionData[]>('/api/session')
 
@@ -55,7 +55,12 @@
 		}
 	})
 
-	watch(() => route.params.id && getSessionState(route.params.id as string).isLoading, async (isLoading, wasLoading) => {
+	// Sessions are persisted server-side only when a response finishes, so refresh when
+	// any session stops loading, not just the one being viewed.
+	const chatSessions = useState<Record<string, { isLoading: boolean }>>('ai-chat-sessions', () => ({}))
+	const anyLoading = computed(() => Object.values(chatSessions.value).some(s => s.isLoading))
+
+	watch(anyLoading, async (isLoading, wasLoading) => {
 		if (wasLoading && !isLoading) {
 			await refresh()
 			sessionData.value = data.value ?? []
