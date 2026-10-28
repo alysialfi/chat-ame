@@ -5,7 +5,7 @@
 		</div>
 
     <main class="w-4/5">
-			<NuxtPage />
+			<NuxtPage :key="$route.fullPath"/>
     </main>
   </div>
 </template>
