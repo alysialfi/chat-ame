@@ -1,4 +1,5 @@
 import { serverSupabaseServiceRole } from '#supabase/server'
+import { assertSessionNotDeleted } from '~~/server/utils/sessions'
 const PAGE_SIZE = 20
 
 export default defineEventHandler(async (event) => {
@@ -9,6 +10,9 @@ export default defineEventHandler(async (event) => {
 	}
 
 	const { cursor } = getQuery(event)
+	const supabase = serverSupabaseServiceRole(event)
+
+	await assertSessionNotDeleted(event, sessionId)
 
 	// Only check session liveness on the first page load (no cursor)
 	let sessionAlive = true
@@ -22,7 +26,6 @@ export default defineEventHandler(async (event) => {
 		}
 	}
 
-	const supabase = serverSupabaseServiceRole(event)
 	let query = supabase
 		.from('chats')
 		.select('id, role, content')
