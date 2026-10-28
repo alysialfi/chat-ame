@@ -47,7 +47,7 @@
 
 		<div class="fixed bottom-0 w-4/5 h-28 bg-gradient-to-b from-transparent to-white">
 			<div class="px-4 md:px-8 lg:px-16 py-8">
-				<InputSearch mode="prompt" :disabled="chat.readOnly || chat.isLoading" @send="onSend"/>
+				<InputSearch mode="prompt" :disabled="chat.readOnly || chat.isLoading" :read-only="chat.readOnly"@send="onSend"/>
 			</div>
 		</div>
 	</div>
