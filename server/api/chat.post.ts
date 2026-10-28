@@ -84,10 +84,15 @@ export default defineEventHandler(async (event) => {
 							send({ delta: props.delta })
 						} else if (
 							evt.type === 'session.status' && props.sessionID === sessionId &&
-							props.status?.type === 'retry' && props.status?.action?.reason === 'free_tier_limit'
+							props.status?.type === 'retry'
 						) {
 							if (pendingModel) continue // already switching
-							markExhausted(model.modelID, props.status.next ?? Date.now() + 60 * 60 * 1000)
+							// free_tier_limit: mark exhausted until quota resets
+							// other errors (e.g. model unavailable): mark exhausted for 5 minutes
+							const until = props.status?.action?.reason === 'free_tier_limit'
+								? (props.status.next ?? Date.now() + 60 * 60 * 1000)
+								: Date.now() + 5 * 60 * 1000
+							markExhausted(model.modelID, until)
 							const next = pickModel()
 							if (!next) {
 								ocFetch(`/session/${sessionId}/abort`, { method: 'POST' }).catch(() => {})
