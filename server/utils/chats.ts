@@ -7,13 +7,13 @@ export async function storeToChatsTable(event: H3Event, sessionId: string, userC
 	const { error: sessionError } = await supabase.from('sessions').upsert({ id: sessionId }, { onConflict: 'id', ignoreDuplicates: true })
 	if (sessionError) {
 		console.error('Failed to ensure session', sessionError)
-		return
+		return null
 	}
 
 	const { error, data } = await supabase.from('chats').insert([
 		{ session_id: sessionId, role: 'user', content: userContent },
 		{ session_id: sessionId, role: 'assistant', content: assistantContent },
-	])
+	]).select('id, role')
 
 	await supabase.from('sessions')
 		.update({ updated_at: new Date().toISOString() })
@@ -26,4 +26,11 @@ export async function storeToChatsTable(event: H3Event, sessionId: string, userC
 		.is('title', null)
 
 	if (error) console.error('Failed to store chat history', error)
+
+	const idOf = (role: string) => data?.find(row => row.role === role)?.id
+	const user = idOf('user')
+	const assistant = idOf('assistant')
+	return user !== undefined && assistant !== undefined
+		? { user: Number(user), assistant: Number(assistant) }
+		: null
 }
