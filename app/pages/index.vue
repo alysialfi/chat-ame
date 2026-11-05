@@ -1,6 +1,6 @@
 <template>
-  <div class="h-screen p-16">
-    <h1 class="text-gray-500 mb-10">Hi there, {{ user.email }}</h1>
+  <div class="h-full flex flex-col px-8 pb-9">
+    <h1 class="flex-1 flex items-center justify-center font-mono text-sm text-mute">Hi there, {{ user?.email }}</h1>
 
 		<InputSearch mode="sess" @send="createChat" />
   </div>
