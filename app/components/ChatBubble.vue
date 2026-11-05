@@ -6,6 +6,6 @@
 
 <template>
 	<div>
-		<MDC :value="props.content" tag="article" class="prose max-w-none break-words whitespace-normal overflow-x-auto"/>
+		<MDC :value="props.content" tag="article" class="max-w-none break-words whitespace-normal overflow-x-auto"/>
 	</div>
 </template>
