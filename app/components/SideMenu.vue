@@ -1,21 +1,33 @@
 <template>
-  <nav class="h-screen w-full flex flex-col bg-neutral-50 border border-r border-gray-200">
-		<NuxtLink to="/" class="p-4 flex justify-center items-center gap-1">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
-				<path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25ZM12.75 9a.75.75 0 0 0-1.5 0v2.25H9a.75.75 0 0 0 0 1.5h2.25V15a.75.75 0 0 0 1.5 0v-2.25H15a.75.75 0 0 0 0-1.5h-2.25V9Z" clip-rule="evenodd" />
-			</svg>
-			New chat
-		</NuxtLink>
-		<ul class="flex-grow-1 overflow-y-auto">
-			<li v-for="title in sessionData" :class="$route.params.id === title.id ? 'bg-gray-200 rounded-md' : 'bg-neutral-50'" class="group flex justify-between items-center">
-				<NuxtLink :to="`/chat/${title.id}`" class="block p-4 text-gray-600">{{ title.title }}</NuxtLink>
-				<button type="button" aria-label="Delete chat" class="p-2 mr-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100" @click="onDelete(title.id)">
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-						<path fill-rule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clip-rule="evenodd" />
-					</svg>
-        </button>
+  <nav class="h-screen w-[260px] shrink-0 flex flex-col bg-side text-ink border-r border-line">
+		<NuxtLink to="/" class="px-6 pt-6 font-mono text-lg font-semibold leading-[22px]">ame</NuxtLink>
+		<NuxtLink to="/" class="mx-4 mt-[22px] h-10 px-4 flex items-center bg-ink text-canvas text-sm font-medium">+&nbsp;&nbsp;New chat</NuxtLink>
+		<div class="px-6 mt-8 mb-3.5 font-mono text-[11px] font-medium uppercase leading-[14px] text-mute">Recent</div>
+		<ul class="flex-1 overflow-y-auto">
+			<li v-for="title in sessionData" :key="title.id" :class="$route.params.id === title.id ? 'bg-active text-ink font-medium' : 'text-mute hover:bg-active'" class="group mx-3 mb-2 h-9 pl-3 pr-2 flex items-center gap-2">
+				<input
+					v-if="editingId === title.id"
+					v-model="editTitle"
+					type="text"
+					maxlength="60"
+					@vue:mounted="({ el }) => el.focus()"
+					class="flex-1 min-w-0 h-7 bg-canvas border border-line-strong text-ink text-[13px] font-normal px-2 outline-none focus:border-soft"
+					@keyup.enter="onRename(title.id)"
+					@keyup.esc="editingId = null"
+					@blur="editingId = null"
+				/>
+				<NuxtLink v-else :to="`/chat/${title.id}`" class="flex-1 min-w-0 h-full flex items-center text-[13px]"><span class="truncate">{{ title.title }}</span></NuxtLink>
+				<div v-if="editingId !== title.id" :class="$route.params.id === title.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'" class="flex items-center gap-2 text-soft">
+					<button type="button" aria-label="Rename chat" class="hover:text-ink" @click="startRename(title)">
+						<IconEdit />
+					</button>
+					<button type="button" aria-label="Delete chat" class="hover:text-danger" @click="onDelete(title.id)">
+						<IconTrash />
+					</button>
+				</div>
 			</li>
 		</ul>
+		<button type="button" class="h-14 shrink-0 px-6 border-t border-line flex items-center font-mono text-xs text-mute hover:text-ink" @click="isModalActive = true">Search&nbsp;&nbsp;⌘K</button>
 	</nav>
 </template>
 
@@ -26,11 +38,44 @@
 	}
 	const route = useRoute()
 	const { reset } = useAiChat()
-	const { deleteSession } = useAiSession()
+	const { deleteSession, renameSession } = useAiSession()
 	const { data, pending, error, refresh } = await useFetch<SessionData[]>('/api/session')
 
-	const sessionData = ref<SessionData[]>(data.value ?? [])
+	const sessionData = useState<SessionData[]>('session-list', () => data.value ?? [])
 	const pendingSidebarEntry = useState<SessionData | null>('pending-sidebar', () => null)
+	const isModalActive = useState<boolean>('is-modal-active', () => false)
+
+	const onKeydown = (e: KeyboardEvent) => {
+		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+			e.preventDefault()
+			isModalActive.value = true
+		}
+	}
+	onMounted(() => window.addEventListener('keydown', onKeydown))
+	onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+	const editingId = ref<string | null>(null)
+	const editTitle = ref<string>('')
+
+	const startRename = (session: SessionData) => {
+		editingId.value = session.id
+		editTitle.value = session.title ?? ''
+	}
+
+	const onRename = async (id: string) => {
+		const title = editTitle.value.trim()
+		editingId.value = null
+		if (!title) return
+
+		const previous = sessionData.value
+		sessionData.value = previous.map(s => s.id === id ? { ...s, title } : s)
+
+		try {
+			await renameSession(id, title)
+		} catch (error) {
+			sessionData.value = previous
+		}
+	}
 
 	const onDelete = async (id: string) => {
 		if (!confirm('Are you sure you want to delete this chat?')) return
