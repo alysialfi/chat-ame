@@ -1,14 +1,16 @@
 <template>
-  <div class="flex">
-		<div class="w-1/5">
-			<SideMenu />
-		</div>
+  <div class="flex h-screen">
+		<SideMenu v-if="!isAuthPage" />
 
-    <main class="w-4/5">
+		<SearchModal />
+
+    <main class="flex-1 min-w-0 h-screen overflow-y-auto">
 			<NuxtPage :key="$route.fullPath"/>
     </main>
   </div>
 </template>
 
-<script setup>
+<script lang="ts" setup>
+	const route = useRoute()
+	const isAuthPage = computed(() => route.path === '/login')
 </script>
