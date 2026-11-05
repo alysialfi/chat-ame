@@ -124,8 +124,8 @@ export default defineEventHandler(async (event) => {
 							send({ error: { message: err?.data?.message ?? err?.name ?? 'OpenCode session error' } })
 							finished = true
 						} else if (evt.type === 'session.idle' && props.sessionID === sessionId) {
-							await storeToChatsTable(event, sessionId, message, assistantText)
-							send({ done: true })
+							const messageIds = await storeToChatsTable(event, sessionId, message, assistantText)
+							send({ done: true, messageIds })
 							finished = true
 						}
 					}
