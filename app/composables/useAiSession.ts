@@ -12,5 +12,12 @@ export default function() {
 		})
 	}
 
-	return { createSession, deleteSession }
+	const renameSession = async (id: string, title: string): Promise<void> => {
+		await $fetch(`/api/session/${id}`, {
+			method: 'PATCH',
+			body: { title }
+		})
+	}
+
+	return { createSession, deleteSession, renameSession }
 }
