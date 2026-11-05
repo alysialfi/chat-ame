@@ -18,8 +18,8 @@
 </script>
 
 <template>
-	<div class="flex gap-2">
-		<input v-model="prompt" type="text" :disabled="disabled" @keyup.enter="handler" :placeholder="readOnly ?'this session has ended (read-only)' : 'what\'s on your mind..'" class="w-3/4 border-2 border-gray-400 px-4 py-2 rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed" />
-		<button @click="handler" :disabled="disabled" class="w-1/4 bg-black text-white px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">send</button>
+	<div class="flex items-center gap-3 h-14 pl-6 pr-3 bg-side border border-line-strong focus-within:border-soft">
+		<input v-model="prompt" type="text" :disabled="disabled" @keyup.enter="handler" :placeholder="readOnly ?'this session has ended (read-only)' : 'Ask anything…'" class="flex-1 min-w-0 bg-transparent text-ink text-sm outline-none disabled:cursor-not-allowed" />
+		<button @click="handler" :disabled="disabled" aria-label="Send" class="shrink-0 w-10 h-9 bg-ink text-canvas font-mono text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed">↵</button>
 	</div>
 </template>
