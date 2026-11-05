@@ -8,6 +8,7 @@ interface StreamPayload {
 	delta?: string
 	error?: { message?: string }
 	done?: boolean
+	messageIds?: { user: number, assistant: number } | null
 }
 export interface SessionChatState {
 	messages: ChatMessage[]
@@ -147,6 +148,7 @@ export function useAiChat() {
 		state.messages.push({ role: 'user', content: text })
 		state.messages.push({ role: 'assistant', content: '' })
 
+		const userMsg = state.messages[state.messages.length - 2]!
 		const assistantMsg = state.messages[state.messages.length - 1]!
 		state.isLoading = true
 
@@ -167,6 +169,10 @@ export function useAiChat() {
 				}
 				if (payload.delta) {
 					assistantMsg.content += payload.delta
+				}
+				if (payload.messageIds) {
+					userMsg.id = payload.messageIds.user
+					assistantMsg.id = payload.messageIds.assistant
 				}
 			})
 		} catch (err: any) {
@@ -259,8 +265,28 @@ export function useAiChat() {
 		}
 	}
 
+	const editMessage = async (sessionId: string, messageId: number, content: string) => {
+		const text = content.trim()
+		if (!text) return
+
+		await $fetch(`/api/chat/${sessionId}/${messageId}`, {
+			method: 'PATCH',
+			body: { content: text }
+		})
+		const message = getSessionState(sessionId).messages.find(m => m.id === messageId)
+		if (message) message.content = text
+	}
+
+	const deleteMessage = async (sessionId: string, messageId: number) => {
+		await $fetch(`/api/chat/${sessionId}/${messageId}`, { method: 'DELETE' })
+		const state = getSessionState(sessionId)
+		state.messages = state.messages.filter(m => m.id !== messageId)
+	}
+
 	return {
 		getSessionState,
+		editMessage,
+		deleteMessage,
 		createChat,
 		startMessage,
 		sendMessage,
